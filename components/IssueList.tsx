@@ -1,11 +1,13 @@
 import React, { useState, useMemo } from 'react';
-import { Issue, IssueStatus } from '../types';
+import { Issue, IssueStatus, User } from '../types';
 import IssueCard from './IssueCard';
 import MapDisplay from './MapDisplay';
 
 interface IssueListProps {
   issues: Issue[];
   isLoading: boolean;
+  currentUser: User;
+  onStatusChange: (issueId: string, newStatus: IssueStatus) => void;
 }
 
 const FilterButton: React.FC<{
@@ -29,7 +31,7 @@ const FilterButton: React.FC<{
   </button>
 );
 
-const IssueList: React.FC<IssueListProps> = ({ issues, isLoading }) => {
+const IssueList: React.FC<IssueListProps> = ({ issues, isLoading, currentUser, onStatusChange }) => {
   const [filter, setFilter] = useState<'all' | IssueStatus>('all');
 
   const filteredIssues = useMemo(() => {
@@ -70,7 +72,12 @@ const IssueList: React.FC<IssueListProps> = ({ issues, isLoading }) => {
       {filteredIssues.length > 0 ? (
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           {filteredIssues.map(issue => (
-            <IssueCard key={issue.id} issue={issue} />
+            <IssueCard 
+              key={issue.id} 
+              issue={issue} 
+              currentUser={currentUser} 
+              onStatusChange={onStatusChange} 
+            />
           ))}
         </div>
       ) : (

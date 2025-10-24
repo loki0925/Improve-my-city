@@ -1,7 +1,5 @@
-
 import { GoogleGenAI, Type } from '@google/genai';
 import { Issue, Priority } from '../types';
-// FIX: Added static import for issueService to avoid using await in a non-async function.
 import { getIssueById } from './issueService';
 
 const API_KEY = process.env.API_KEY;
@@ -77,15 +75,12 @@ export const analyzeIssue = async (description: string, imageBase64: string, ima
   }
 };
 
-// For the chatbot, a simple rule-based response is sufficient and more efficient for a hackathon.
-export const getChatbotResponse = (issueId: string): string => {
+export const getChatbotResponse = async (issueId: string): Promise<string> => {
   if (!issueId) {
-    return "Please provide a report ID (e.g., 'What is the status of IMC-12345?').";
+    return "Please provide a report ID (e.g., 'What is the status of a report? Please include the full ID.').";
   }
   
-  // This is a direct import from another service, which is fine for this structure.
-  // In a larger app, you might pass the data in, but this keeps the chatbot logic clean.
-  const issue = getIssueById(issueId.trim().toUpperCase());
+  const issue = await getIssueById(issueId.trim());
 
   if (issue) {
     return `Report ${issue.id} ( "${issue.title}" ) is currently marked as: ${issue.status}. It was reported on ${new Date(issue.createdAt).toLocaleDateString()}.`;

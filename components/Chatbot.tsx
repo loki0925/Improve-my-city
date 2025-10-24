@@ -1,8 +1,7 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 
 interface ChatbotProps {
-    onSendMessage: (query: string) => string;
+    onSendMessage: (query: string) => Promise<string>;
 }
 
 interface Message {
@@ -13,7 +12,7 @@ interface Message {
 const Chatbot: React.FC<ChatbotProps> = ({ onSendMessage }) => {
     const [isOpen, setIsOpen] = useState(false);
     const [messages, setMessages] = useState<Message[]>([
-        { sender: 'bot', text: "Hello! How can I help? You can ask for the status of a report by its ID (e.g., 'Status of IMC-ABC12')." }
+        { sender: 'bot', text: "Hello! How can I help? You can ask for the status of a report by its ID (e.g., 'Status of 5aBcDeF6gHiJkL7mNoPq')." }
     ]);
     const [inputValue, setInputValue] = useState('');
     const [isTyping, setIsTyping] = useState(false);
@@ -31,21 +30,20 @@ const Chatbot: React.FC<ChatbotProps> = ({ onSendMessage }) => {
         setInputValue(e.target.value);
     };
 
-    const handleFormSubmit = (e: React.FormEvent) => {
+    const handleFormSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (inputValue.trim() === '') return;
 
         const userMessage: Message = { text: inputValue, sender: 'user' };
         setMessages(prev => [...prev, userMessage]);
+        const currentInput = inputValue;
         setInputValue('');
         setIsTyping(true);
 
-        setTimeout(() => {
-            const botResponseText = onSendMessage(inputValue);
-            const botMessage: Message = { text: botResponseText, sender: 'bot' };
-            setMessages(prev => [...prev, botMessage]);
-            setIsTyping(false);
-        }, 1200);
+        const botResponseText = await onSendMessage(currentInput);
+        const botMessage: Message = { text: botResponseText, sender: 'bot' };
+        setMessages(prev => [...prev, botMessage]);
+        setIsTyping(false);
     };
 
     return (

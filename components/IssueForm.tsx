@@ -1,4 +1,3 @@
-
 import React, { useState, useRef } from 'react';
 import { Issue, IssueStatus } from '../types';
 import * as issueService from '../services/issueService';
@@ -72,13 +71,13 @@ const IssueForm: React.FC<IssueFormProps> = ({ onIssueAdded }) => {
         title,
         description,
         summary,
-        photoUrl: photoPreview!,
+        photoFile: photo,
         tags,
         priority,
         location,
       };
 
-      const addedIssue = issueService.addIssue(newIssueData);
+      const addedIssue = await issueService.addIssue(newIssueData);
       onIssueAdded(addedIssue);
 
     } catch (err) {

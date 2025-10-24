@@ -1,4 +1,3 @@
-
 export enum IssueStatus {
   PENDING = 'Pending',
   IN_PROGRESS = 'In Progress',
@@ -17,7 +16,7 @@ export interface Issue {
   title: string;
   description: string;
   summary: string;
-  photoUrl: string; // base64 data URL
+  photoUrl: string; // Public URL from Firebase Storage
   tags: string[];
   priority: Priority;
   location: {
@@ -26,4 +25,10 @@ export interface Issue {
   } | null;
   status: IssueStatus;
   createdAt: string; // ISO string
+}
+
+export interface User {
+  id: string;
+  email: string;
+  role: 'user' | 'admin';
 }

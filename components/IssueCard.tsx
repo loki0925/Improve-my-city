@@ -1,13 +1,14 @@
-
 import React from 'react';
-import { Issue } from '../types';
+import { Issue, User, IssueStatus } from '../types';
 import { STATUS_COLORS, PRIORITY_COLORS } from '../constants';
 
 interface IssueCardProps {
   issue: Issue;
+  currentUser: User;
+  onStatusChange: (issueId: string, newStatus: IssueStatus) => void;
 }
 
-const IssueCard: React.FC<IssueCardProps> = ({ issue }) => {
+const IssueCard: React.FC<IssueCardProps> = ({ issue, currentUser, onStatusChange }) => {
   const timeAgo = (date: string): string => {
     const seconds = Math.floor((new Date().getTime() - new Date(date).getTime()) / 1000);
     let interval = seconds / 31536000;
@@ -22,6 +23,10 @@ const IssueCard: React.FC<IssueCardProps> = ({ issue }) => {
     if (interval > 1) return Math.floor(interval) + " minutes ago";
     return Math.floor(seconds) + " seconds ago";
   };
+
+  const handleStatusChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    onStatusChange(issue.id, e.target.value as IssueStatus);
+  };
     
   return (
     <div className="bg-white rounded-xl shadow-lg overflow-hidden transition-transform duration-300 hover:scale-105 hover:shadow-2xl flex flex-col">
@@ -30,7 +35,20 @@ const IssueCard: React.FC<IssueCardProps> = ({ issue }) => {
         <div className="flex justify-between items-start mb-2 gap-2">
             <h3 className="text-lg font-bold text-brand-dark leading-tight flex-1">{issue.title}</h3>
             <div className="flex flex-col items-end gap-2 flex-shrink-0">
-                <span className={`px-3 py-1 text-xs font-semibold rounded-full border ${STATUS_COLORS[issue.status]}`}>{issue.status}</span>
+                {currentUser.role === 'admin' ? (
+                  <select
+                    value={issue.status}
+                    onChange={handleStatusChange}
+                    className={`text-xs font-semibold rounded-full border cursor-pointer focus:ring-2 focus:ring-brand-blue focus:outline-none ${STATUS_COLORS[issue.status]}`}
+                    style={{ WebkitAppearance: 'none', appearance: 'none', padding: '0.25rem 0.75rem' }}
+                  >
+                    <option value={IssueStatus.PENDING}>Pending</option>
+                    <option value={IssueStatus.IN_PROGRESS}>In Progress</option>
+                    <option value={IssueStatus.RESOLVED}>Resolved</option>
+                  </select>
+                ) : (
+                  <span className={`px-3 py-1 text-xs font-semibold rounded-full border ${STATUS_COLORS[issue.status]}`}>{issue.status}</span>
+                )}
                 <span className={`px-3 py-1 text-xs font-semibold rounded-full border flex items-center gap-1.5 ${PRIORITY_COLORS[issue.priority]}`}>
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M3 6a3 3 0 013-3h10a1 1 0 01.8 1.6L14.25 8l2.55 3.4A1 1 0 0116 13H6a1 1 0 01-1-1V6z" clipRule="evenodd" /></svg>
                     {issue.priority} Priority

@@ -2,11 +2,13 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Issue } from '../types';
 import { STATUS_MARKER_COLORS } from '../constants';
+import { firebaseConfig } from '../services/firebase';
 
-// Add TypeScript declaration for the google maps object on the window
+// Add TypeScript declaration for google maps and the auth failure handler
 declare global {
   interface Window {
     google: any;
+    gm_authFailure?: () => void;
   }
 }
 
@@ -32,69 +34,82 @@ const loadGoogleMapsScript = (apiKey: string): Promise<void> => {
     
     const script = document.createElement('script');
     script.id = scriptId;
-    script.src = `https://maps.googleapis.com/maps/api/js?key=AIzaSyAOVYRIgupAurZup5y1PRh8Ismb1A3lLao&maps_ids=IMPROVE_MY_CITY_MAP`;
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}`;
     script.async = true;
     script.defer = true;
     script.onload = () => resolve();
-    script.onerror = () => reject(new Error('Google Maps script failed to load.'));
+    script.onerror = () => reject(new Error('Google Maps script could not be loaded. Please check your network connection.'));
     document.head.appendChild(script);
   });
 };
 
 const MapDisplay: React.FC<MapDisplayProps> = ({ issues }) => {
   const mapRef = useRef<HTMLDivElement>(null);
-  const [isScriptLoaded, setIsScriptLoaded] = useState(false);
-  // FIX: Replaced `google.maps.Map` with `any` to resolve "Cannot find namespace 'google'" error. In a real-world scenario, installing @types/google.maps or adding ambient declarations would be preferred.
-  const [map, setMap] = useState<any | null>(null);
-  // FIX: Replaced `google.maps.Marker` with `any` to resolve "Cannot find namespace 'google'" error.
+  const mapInstanceRef = useRef<any | null>(null);
   const markersRef = useRef<any[]>([]);
+  const [isScriptLoaded, setIsScriptLoaded] = useState(false);
+  const [mapError, setMapError] = useState<string | null>(null);
 
+  // Effect to load Google Maps script and handle errors
   useEffect(() => {
-    const apiKey = process.env.API_KEY;
-    if (apiKey) {
-      loadGoogleMapsScript(apiKey)
+    // This will be called by the Google Maps script if the key is invalid, preventing an app freeze.
+    window.gm_authFailure = () => {
+      setMapError(
+        'Google Maps failed to load. The provided API key is invalid or has not been configured correctly for the Maps JavaScript API in your Google Cloud Platform project.'
+      );
+    };
+
+    if (firebaseConfig.apiKey) {
+      loadGoogleMapsScript(firebaseConfig.apiKey)
         .then(() => setIsScriptLoaded(true))
-        .catch(console.error);
+        .catch(error => {
+          console.error(error);
+          setMapError(error.message);
+        });
     } else {
-        console.error("Google Maps API key not found in process.env.API_KEY");
+        const errorMsg = "Google Maps could not be loaded. The API key is missing from the Firebase configuration.";
+        console.error(errorMsg);
+        setMapError(errorMsg);
     }
+
+    // Cleanup function to remove the global handler when the component unmounts.
+    return () => {
+      delete window.gm_authFailure;
+    };
   }, []);
 
-  // Initialize map
+  // Effect to initialize map and update markers
   useEffect(() => {
-    if (isScriptLoaded && mapRef.current && !map) {
-      const defaultCenter = { lat: 21.1702, lng: 72.8311 }; // Default: Surat, India
-      const issuesWithLocation = issues.filter(issue => issue.location);
-      
-      let center = defaultCenter;
-      if (issuesWithLocation.length > 0) {
-        const totalLat = issuesWithLocation.reduce((sum, issue) => sum + issue.location!.lat, 0);
-        const totalLng = issuesWithLocation.reduce((sum, issue) => sum + issue.location!.lon, 0);
-        center = { lat: totalLat / issuesWithLocation.length, lng: totalLng / issuesWithLocation.length };
+    // Only proceed if the script is loaded, there is no error, and the map div is ready.
+    if (isScriptLoaded && !mapError && mapRef.current) {
+      if (!mapInstanceRef.current) {
+        const defaultCenter = { lat: 21.1702, lng: 72.8311 }; // Default: Surat, India
+        const issuesWithLocation = issues.filter(issue => issue.location);
+        
+        let center = defaultCenter;
+        if (issuesWithLocation.length > 0) {
+          const totalLat = issuesWithLocation.reduce((sum, issue) => sum + issue.location!.lat, 0);
+          const totalLng = issuesWithLocation.reduce((sum, issue) => sum + issue.location!.lon, 0);
+          center = { lat: totalLat / issuesWithLocation.length, lng: totalLng / issuesWithLocation.length };
+        }
+
+        const newMap = new window.google.maps.Map(mapRef.current, {
+          center,
+          zoom: issuesWithLocation.length > 0 ? 12 : 10,
+          mapId: 'IMPROVE_MY_CITY_MAP',
+          disableDefaultUI: true,
+          zoomControl: true,
+          clickableIcons: false,
+        });
+        mapInstanceRef.current = newMap;
       }
 
-      const newMap = new window.google.maps.Map(mapRef.current, {
-        center,
-        zoom: issuesWithLocation.length > 0 ? 12 : 10,
-        mapId: 'IMPROVE_MY_CITY_MAP',
-        disableDefaultUI: true,
-        zoomControl: true,
-        clickableIcons: false,
-      });
-      setMap(newMap);
-    }
-  }, [isScriptLoaded, issues, map]);
+      const map = mapInstanceRef.current;
 
-  // Update markers
-  useEffect(() => {
-    if (map) {
-      // Clear old markers
       markersRef.current.forEach(marker => marker.setMap(null));
       markersRef.current = [];
 
-      const issuesWithLocation = issues.filter(issue => issue.location);
-
-      issuesWithLocation.forEach(issue => {
+      issues.filter(issue => issue.location).forEach(issue => {
         const markerIcon = {
           path: 'M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z',
           fillColor: STATUS_MARKER_COLORS[issue.status],
@@ -128,15 +143,26 @@ const MapDisplay: React.FC<MapDisplayProps> = ({ issues }) => {
         markersRef.current.push(marker);
       });
     }
-  }, [map, issues]);
+  }, [isScriptLoaded, issues, mapError]);
 
 
-  if (!process.env.API_KEY) {
-      return (
-          <div className="h-[400px] w-full bg-gray-200 rounded-lg flex items-center justify-center text-center text-gray-600 p-4 mb-8">
-              Google Maps could not be loaded. The API key is missing.
+  if (mapError) {
+    return (
+        <div className="h-[400px] w-full bg-red-100 border border-red-300 text-red-800 rounded-lg flex items-center justify-center text-center p-4 mb-8 shadow-md">
+          <div>
+            <h3 className="font-bold text-lg mb-2">Map Error</h3>
+            <p className="text-sm">{mapError}</p>
           </div>
-      );
+        </div>
+    );
+  }
+  
+  if (!isScriptLoaded) {
+    return (
+        <div className="h-[400px] w-full bg-gray-200 rounded-lg flex items-center justify-center text-center text-gray-600 p-4 mb-8 shadow-md animate-pulse">
+            Loading Map...
+        </div>
+    );
   }
 
   return <div ref={mapRef} className="h-[400px] w-full bg-gray-200 rounded-lg mb-8 shadow-md" aria-label="Map of reported issues" />;
