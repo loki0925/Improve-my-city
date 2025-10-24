@@ -64,7 +64,7 @@ const IssueForm: React.FC<IssueFormProps> = ({ onIssueAdded }) => {
     setIsAnalyzing(true);
 
     try {
-      const { tags, summary } = await geminiService.generateTagsAndSummary(description, photoPreview!, photo.type);
+      const { tags, summary, priority } = await geminiService.analyzeIssue(description, photoPreview!, photo.type);
       
       setIsAnalyzing(false);
 
@@ -74,6 +74,7 @@ const IssueForm: React.FC<IssueFormProps> = ({ onIssueAdded }) => {
         summary,
         photoUrl: photoPreview!,
         tags,
+        priority,
         location,
       };
 

@@ -1,3 +1,4 @@
+
 import React, { useEffect, useRef, useState } from 'react';
 import { Issue } from '../types';
 import { STATUS_MARKER_COLORS } from '../constants';
@@ -62,7 +63,7 @@ const MapDisplay: React.FC<MapDisplayProps> = ({ issues }) => {
   // Initialize map
   useEffect(() => {
     if (isScriptLoaded && mapRef.current && !map) {
-      const defaultCenter = { lat: 37.7749, lng: -122.4194 }; // Default: San Francisco
+      const defaultCenter = { lat: 21.1702, lng: 72.8311 }; // Default: Surat, India
       const issuesWithLocation = issues.filter(issue => issue.location);
       
       let center = defaultCenter;
@@ -74,7 +75,7 @@ const MapDisplay: React.FC<MapDisplayProps> = ({ issues }) => {
 
       const newMap = new window.google.maps.Map(mapRef.current, {
         center,
-        zoom: issuesWithLocation.length > 0 ? 13 : 8,
+        zoom: issuesWithLocation.length > 0 ? 12 : 10,
         mapId: 'IMPROVE_MY_CITY_MAP',
         disableDefaultUI: true,
         zoomControl: true,
@@ -113,7 +114,11 @@ const MapDisplay: React.FC<MapDisplayProps> = ({ issues }) => {
         });
         
         const infowindow = new window.google.maps.InfoWindow({
-            content: `<div style="color: #1F2937; font-family: sans-serif;"><strong>${issue.title}</strong><p style="font-style: italic;">"${issue.summary}"</p></div>`
+            content: `<div style="color: #1F2937; font-family: sans-serif; max-width: 200px;">
+                            <strong style="font-size: 1.1em;">${issue.title}</strong>
+                            <p style="margin: 4px 0;"><strong>Priority:</strong> ${issue.priority}</p>
+                            <p style="font-style: italic; margin: 4px 0 0 0;">"${issue.summary}"</p>
+                         </div>`
         });
 
         marker.addListener('click', () => {

@@ -1,6 +1,6 @@
 
 import { GoogleGenAI, Type } from '@google/genai';
-import { Issue } from '../types';
+import { Issue, Priority } from '../types';
 // FIX: Added static import for issueService to avoid using await in a non-async function.
 import { getIssueById } from './issueService';
 
@@ -22,13 +22,14 @@ const fileToGenerativePart = (base64: string, mimeType: string) => {
   };
 };
 
-export const generateTagsAndSummary = async (description: string, imageBase64: string, imageMimeType: string): Promise<{ tags: string[], summary: string }> => {
+export const analyzeIssue = async (description: string, imageBase64: string, imageMimeType: string): Promise<{ tags: string[], summary: string, priority: Priority }> => {
   try {
     const imagePart = fileToGenerativePart(imageBase64.split(',')[1], imageMimeType);
 
     const prompt = `Analyze the attached image and the user's description of a civic issue. Based on both, provide the following in JSON format:
     1. A short, one-sentence summary of the issue.
     2. An array of 3 to 5 relevant tags for categorization (e.g., 'pothole', 'street_light', 'sanitation', 'road_damage').
+    3. A priority level for the issue. The priority can be one of: "Low", "Medium", "High", or "Critical". A fire, major accident, or exposed live wire should be "Critical". A large pothole on a busy road might be "High". A faded sign might be "Medium". Minor graffiti would be "Low".
     
     User's Description: "${description}"`;
     
@@ -50,6 +51,11 @@ export const generateTagsAndSummary = async (description: string, imageBase64: s
               items: {
                 type: Type.STRING
               }
+            },
+            priority: {
+              type: Type.STRING,
+              description: "The priority of the issue.",
+              enum: [Priority.LOW, Priority.MEDIUM, Priority.HIGH, Priority.CRITICAL]
             }
           }
         }
@@ -61,11 +67,12 @@ export const generateTagsAndSummary = async (description: string, imageBase64: s
     return result;
 
   } catch (error) {
-    console.error("Error generating tags and summary from Gemini:", error);
+    console.error("Error analyzing issue from Gemini:", error);
     // Provide a fallback in case of API error
     return {
       tags: ['issue'],
       summary: description.substring(0, 100) + (description.length > 100 ? '...' : ''),
+      priority: Priority.MEDIUM,
     };
   }
 };

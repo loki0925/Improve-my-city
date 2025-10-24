@@ -5,6 +5,13 @@ export enum IssueStatus {
   RESOLVED = 'Resolved',
 }
 
+export enum Priority {
+  LOW = 'Low',
+  MEDIUM = 'Medium',
+  HIGH = 'High',
+  CRITICAL = 'Critical',
+}
+
 export interface Issue {
   id: string;
   title: string;
@@ -12,6 +19,7 @@ export interface Issue {
   summary: string;
   photoUrl: string; // base64 data URL
   tags: string[];
+  priority: Priority;
   location: {
     lat: number;
     lon: number;

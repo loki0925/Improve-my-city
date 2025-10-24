@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { Issue } from '../types';
-import { STATUS_COLORS } from '../constants';
+import { STATUS_COLORS, PRIORITY_COLORS } from '../constants';
 
 interface IssueCardProps {
   issue: Issue;
@@ -27,9 +27,15 @@ const IssueCard: React.FC<IssueCardProps> = ({ issue }) => {
     <div className="bg-white rounded-xl shadow-lg overflow-hidden transition-transform duration-300 hover:scale-105 hover:shadow-2xl flex flex-col">
       <img className="h-48 w-full object-cover" src={issue.photoUrl} alt={issue.title} />
       <div className="p-5 flex flex-col flex-grow">
-        <div className="flex justify-between items-start mb-2">
-            <h3 className="text-lg font-bold text-brand-dark leading-tight">{issue.title}</h3>
-            <span className={`px-3 py-1 text-xs font-semibold rounded-full border ${STATUS_COLORS[issue.status]}`}>{issue.status}</span>
+        <div className="flex justify-between items-start mb-2 gap-2">
+            <h3 className="text-lg font-bold text-brand-dark leading-tight flex-1">{issue.title}</h3>
+            <div className="flex flex-col items-end gap-2 flex-shrink-0">
+                <span className={`px-3 py-1 text-xs font-semibold rounded-full border ${STATUS_COLORS[issue.status]}`}>{issue.status}</span>
+                <span className={`px-3 py-1 text-xs font-semibold rounded-full border flex items-center gap-1.5 ${PRIORITY_COLORS[issue.priority]}`}>
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M3 6a3 3 0 013-3h10a1 1 0 01.8 1.6L14.25 8l2.55 3.4A1 1 0 0116 13H6a1 1 0 01-1-1V6z" clipRule="evenodd" /></svg>
+                    {issue.priority} Priority
+                </span>
+            </div>
         </div>
         
         <p className="text-sm text-gray-600 mb-4 flex-grow italic">"{issue.summary}"</p>
