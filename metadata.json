@@ -1,0 +1,7 @@
+{
+  "name": "Copy of Improve My City",
+  "description": "Report and track civic issues in your neighborhood to help build a better community. Snap a photo, add details, and see real-time progress on resolutions.",
+  "requestFramePermissions": [
+    "geolocation"
+  ]
+}
