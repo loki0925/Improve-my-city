@@ -19,12 +19,12 @@ import { getStorage } from "firebase/storage";
 // =================================================================================
 
 export const firebaseConfig = {
-   apiKey: "AIzaSyAtXJsbkjxxunPT0DuW51x_kHLqCV-LW1s", // <-- REPLACE THIS WITH YOUR ACTUAL API KEY
+apiKey: "AIzaSyAtXJsbkjxxunPT0DuW51x_kHLqCV-LW1s",
   authDomain: "cityfix-app-8d21f.firebaseapp.com",
   projectId: "cityfix-app-8d21f",
-  storageBucket: "cityfix-app-8d21f.appspot.com",
+  storageBucket: "cityfix-app-8d21f.firebasestorage.app",
   messagingSenderId: "1029958752001",
-  appId: "1:102995_kHLqCV-LW1s8752001:web:700368a08e23b96b8b2d00"
+  appId: "1:1029958752001:web:700368a08e23b96b8b2d00"
 };
 
 // Initialize Firebase

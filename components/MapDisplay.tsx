@@ -2,6 +2,8 @@
 
 
 
+
+
 import React, { useEffect, useRef, useState } from 'react';
 import { Issue } from '../types';
 import { STATUS_MARKER_COLORS } from '../constants';
@@ -107,7 +109,7 @@ const MapDisplay: React.FC<MapDisplayProps> = ({ issues }) => {
         const newMap = new window.google.maps.Map(mapRef.current, {
           center,
           zoom: issuesWithLocation.length > 0 ? 12 : 10,
-          mapId: 'IMPROVE_MY_CITY_MAP',
+          mapId: 'RIFI_MAP',
           disableDefaultUI: true,
           zoomControl: true,
           clickableIcons: false,

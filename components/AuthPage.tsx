@@ -81,7 +81,7 @@ const AuthPage: React.FC = () => {
     <div className="min-h-screen bg-brand-gray flex flex-col justify-center items-center p-4">
       <div className="flex items-center gap-3 mb-8">
           <svg className="w-10 h-10 text-brand-blue" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
-          <h1 className="text-3xl md:text-4xl font-bold text-brand-dark">Improve My City</h1>
+          <h1 className="text-3xl md:text-4xl font-bold text-brand-dark">RIFI (Report It, Fix It)</h1>
       </div>
       <div className="w-full max-w-md bg-white p-8 rounded-xl shadow-lg">
         <h2 className="text-2xl font-bold text-center text-brand-dark mb-2">{isLogin ? 'Welcome Back!' : 'Create Account'}</h2>

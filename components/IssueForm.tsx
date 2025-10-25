@@ -94,6 +94,10 @@ const IssueForm: React.FC<IssueFormProps> = ({ onIssueAdded }) => {
       } else if (err.name === 'UploadTimeout') {
           setError("The upload took too long and timed out. This often happens if Firebase Storage is not enabled or if the `storageBucket` URL in your configuration is incorrect. Please double-check your Firebase project setup and your network connection.");
       }
+      // Check for specific Firestore errors
+      else if (err.code === 'permission-denied') {
+          setError("Submission failed: Firestore permission denied. Please check your security rules to ensure authenticated users can create documents in the 'issues' collection.");
+      }
       else {
           setError(`An error occurred: ${err.message || 'Please try again.'}`);
       }
