@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Issue, IssueStatus, User } from './types';
+import { Issue, IssueStatus, Priority } from './types';
 import * as issueService from './services/issueService';
 import Header from './components/Header';
 import IssueForm from './components/IssueForm';
@@ -8,6 +8,8 @@ import Chatbot from './components/Chatbot';
 import AuthPage from './components/AuthPage';
 import { getChatbotResponse } from './services/geminiService';
 import { useAuth } from './contexts/AuthContext';
+import { db } from './services/firebase';
+import { collection, onSnapshot, query, orderBy, getDocs, limit } from "firebase/firestore";
 
 type View = 'dashboard' | 'report';
 
@@ -17,36 +19,71 @@ const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<View>('dashboard');
   const [isLoading, setIsLoading] = useState(true);
 
-  const fetchIssues = useCallback(async () => {
-    setIsLoading(true);
-    const loadedIssues = await issueService.getIssues();
-    setIssues(loadedIssues);
-    setIsLoading(false);
-  }, []);
-
+  // Set up real-time listener for issues from Firestore
   useEffect(() => {
-    if (currentUser) {
-      fetchIssues();
-    }
-  }, [currentUser, fetchIssues]);
+    if (!currentUser) {
+      // If there's no user, don't try to fetch data
+      setIsLoading(false);
+      setIssues([]);
+      return;
+    };
 
-  const handleNewIssueAdded = (newIssue: Issue) => {
-    setIssues(prevIssues => [newIssue, ...prevIssues].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
+    // --- Seeding Logic ---
+    // Check if the database has any issues, if not, seed it with sample data.
+    // This makes the app experience better for the first run.
+    const checkForInitialData = async () => {
+        const issuesCollectionRef = collection(db, 'issues');
+        const q = query(issuesCollectionRef, limit(1));
+        const snapshot = await getDocs(q);
+        if (snapshot.empty) {
+            console.log("Database is empty. Seeding with initial data...");
+            await issueService.seedInitialIssues();
+        }
+    };
+
+    setIsLoading(true);
+    checkForInitialData();
+    // --- End of Seeding Logic ---
+
+    const issuesCollectionRef = collection(db, 'issues');
+    const q = query(issuesCollectionRef, orderBy('createdAt', 'desc'));
+
+    const unsubscribe = onSnapshot(q, (querySnapshot) => {
+      const loadedIssues: Issue[] = [];
+      querySnapshot.forEach((doc) => {
+        loadedIssues.push({ id: doc.id, ...doc.data() } as Issue);
+      });
+      setIssues(loadedIssues);
+      setIsLoading(false);
+    }, (error) => {
+        console.error("Error fetching issues from Firestore: ", error);
+        setIsLoading(false);
+    });
+
+    // Cleanup listener on component unmount
+    return () => unsubscribe();
+  }, [currentUser]);
+
+  const handleNewIssueAdded = () => {
+    // No need to manually add the issue to state anymore,
+    // the real-time listener will do it automatically.
     setCurrentView('dashboard');
   };
 
   const handleIssueStatusChange = async (issueId: string, newStatus: IssueStatus) => {
-    const updatedIssue = await issueService.updateIssueStatus(issueId, newStatus);
-    if (updatedIssue) {
-      setIssues(prevIssues =>
-        prevIssues.map(issue =>
-          issue.id === issueId ? updatedIssue : issue
-        )
-      );
-    }
+    // The UI will update automatically thanks to the onSnapshot listener.
+    // We just need to call the update service.
+    await issueService.updateIssueStatus(issueId, newStatus);
+  };
+
+  const handleIssuePriorityChange = async (issueId: string, newPriority: Priority) => {
+    // UI updates are handled by the real-time listener.
+    await issueService.updateIssuePriority(issueId, newPriority);
   };
   
   const handleChatbotQuery = async (query: string): Promise<string> => {
+      // The chatbot uses a one-time fetch, so we check for an ID in the query.
+      // This is a simplified regex to find Firestore-like IDs.
       const idMatch = query.match(/\b[a-zA-Z0-9]{20}\b/);
       return await getChatbotResponse(idMatch ? idMatch[0] : '');
   };
@@ -65,6 +102,7 @@ const App: React.FC = () => {
             isLoading={isLoading} 
             currentUser={currentUser} 
             onStatusChange={handleIssueStatusChange} 
+            onPriorityChange={handleIssuePriorityChange}
           />
         ) : (
           <IssueForm onIssueAdded={handleNewIssueAdded} />

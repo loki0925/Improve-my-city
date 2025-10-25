@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Issue, IssueStatus, User } from '../types';
+import { Issue, IssueStatus, User, Priority } from '../types';
 import IssueCard from './IssueCard';
 import MapDisplay from './MapDisplay';
 
@@ -8,6 +8,7 @@ interface IssueListProps {
   isLoading: boolean;
   currentUser: User;
   onStatusChange: (issueId: string, newStatus: IssueStatus) => void;
+  onPriorityChange: (issueId: string, newPriority: Priority) => void;
 }
 
 const FilterButton: React.FC<{
@@ -31,7 +32,7 @@ const FilterButton: React.FC<{
   </button>
 );
 
-const IssueList: React.FC<IssueListProps> = ({ issues, isLoading, currentUser, onStatusChange }) => {
+const IssueList: React.FC<IssueListProps> = ({ issues, isLoading, currentUser, onStatusChange, onPriorityChange }) => {
   const [filter, setFilter] = useState<'all' | IssueStatus>('all');
 
   const filteredIssues = useMemo(() => {
@@ -77,6 +78,7 @@ const IssueList: React.FC<IssueListProps> = ({ issues, isLoading, currentUser, o
               issue={issue} 
               currentUser={currentUser} 
               onStatusChange={onStatusChange} 
+              onPriorityChange={onPriorityChange}
             />
           ))}
         </div>

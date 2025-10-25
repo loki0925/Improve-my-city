@@ -1,10 +1,10 @@
 import React, { useState, useRef } from 'react';
-import { Issue, IssueStatus } from '../types';
+import { Issue } from '../types';
 import * as issueService from '../services/issueService';
 import * as geminiService from '../services/geminiService';
 
 interface IssueFormProps {
-  onIssueAdded: (newIssue: Issue) => void;
+  onIssueAdded: () => void;
 }
 
 const IssueForm: React.FC<IssueFormProps> = ({ onIssueAdded }) => {
@@ -16,8 +16,8 @@ const IssueForm: React.FC<IssueFormProps> = ({ onIssueAdded }) => {
   const [error, setError] = useState<string | null>(null);
 
   const [isFetchingLocation, setIsFetchingLocation] = useState(false);
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submissionStep, setSubmissionStep] = useState<'idle' | 'analyzing' | 'uploading' | 'submitting'>('idle');
+  const [uploadProgress, setUploadProgress] = useState(0);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -59,14 +59,13 @@ const IssueForm: React.FC<IssueFormProps> = ({ onIssueAdded }) => {
       return;
     }
     setError(null);
-    setIsSubmitting(true);
-    setIsAnalyzing(true);
 
     try {
+      setSubmissionStep('analyzing');
       const { tags, summary, priority } = await geminiService.analyzeIssue(description, photoPreview!, photo.type);
       
-      setIsAnalyzing(false);
-
+      setSubmissionStep('uploading');
+      setUploadProgress(0);
       const newIssueData = {
         title,
         description,
@@ -77,17 +76,46 @@ const IssueForm: React.FC<IssueFormProps> = ({ onIssueAdded }) => {
         location,
       };
 
-      const addedIssue = await issueService.addIssue(newIssueData);
-      onIssueAdded(addedIssue);
+      await issueService.addIssue(newIssueData, (progress) => {
+        setUploadProgress(progress);
+      });
+      setSubmissionStep('submitting');
+      onIssueAdded();
 
-    } catch (err) {
-      setError('Failed to submit issue. Please try again.');
-      console.error(err);
+    } catch (err: any) {
+      console.error("Submission Error:", err);
+      // Check for specific Firebase Storage errors
+      if (err.code === 'storage/unauthorized') {
+          setError("Submission failed due to a permissions error. Please update your Firebase Storage security rules to allow uploads. This is a necessary one-time setup step.");
+      } else if (err.code === 'storage/bucket-not-found' || err.code === 'storage/project-not-found') {
+          setError("Submission failed because Firebase Storage is not set up correctly. Please go to your Firebase Console, navigate to the Storage section, and click 'Get Started' to enable it.");
+      }
+      else {
+          setError(`An error occurred: ${err.message || 'Please try again.'}`);
+      }
     } finally {
-      setIsSubmitting(false);
-      setIsAnalyzing(false);
+      setSubmissionStep('idle');
+      setUploadProgress(0);
     }
   };
+  
+  const getButtonText = () => {
+      switch(submissionStep) {
+          case 'analyzing':
+              return 'Analyzing with AI...';
+          case 'uploading':
+              if (uploadProgress < 100) {
+                 return `Uploading Photo (${uploadProgress}%)...`;
+              }
+              return 'Finalizing Report...';
+          case 'submitting':
+              return 'Saving Report...';
+          default:
+              return 'Submit Report';
+      }
+  }
+  
+  const isSubmitting = submissionStep !== 'idle';
 
   return (
     <div className="max-w-2xl mx-auto bg-white p-6 md:p-8 rounded-xl shadow-lg">
@@ -162,13 +190,19 @@ const IssueForm: React.FC<IssueFormProps> = ({ onIssueAdded }) => {
         {error && <p className="text-sm text-red-600">{error}</p>}
 
         <div className="pt-4">
-          <button type="submit" disabled={isSubmitting} className="w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-base font-medium text-white bg-brand-blue hover:bg-blue-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-blue disabled:bg-gray-400">
-            {isSubmitting ? (
-              <div className="flex items-center gap-2">
-                 <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                 <span>{isAnalyzing ? 'Analyzing with AI...' : 'Submitting...'}</span>
-              </div>
-            ) : 'Submit Report'}
+          <button type="submit" disabled={isSubmitting} className="w-full relative overflow-hidden flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-base font-medium text-white bg-brand-blue hover:bg-blue-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-blue disabled:bg-gray-400">
+            <div className="flex items-center gap-2 z-10">
+                {isSubmitting && (
+                    <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                )}
+                <span>{getButtonText()}</span>
+            </div>
+             {submissionStep === 'uploading' && (
+                <div 
+                    className="absolute top-0 left-0 h-full bg-blue-700 transition-all duration-150 ease-linear" 
+                    style={{ width: `${uploadProgress}%` }}
+                ></div>
+            )}
           </button>
         </div>
       </form>

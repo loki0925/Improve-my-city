@@ -11,6 +11,12 @@ export enum Priority {
   CRITICAL = 'Critical',
 }
 
+export interface ActionPlan {
+  steps: string[];
+  crew: string;
+  estimatedHours: number;
+}
+
 export interface Issue {
   id: string;
   title: string;
@@ -25,6 +31,7 @@ export interface Issue {
   } | null;
   status: IssueStatus;
   createdAt: string; // ISO string
+  actionPlan?: ActionPlan;
 }
 
 export interface User {

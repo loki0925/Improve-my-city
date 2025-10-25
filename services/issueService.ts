@@ -1,4 +1,20 @@
-import { Issue, IssueStatus, Priority } from '../types';
+import { Issue, IssueStatus, Priority, ActionPlan } from '../types';
+import { db, storage } from './firebase';
+import { 
+  doc, 
+  getDoc, 
+  addDoc, 
+  updateDoc, 
+  collection 
+} from "firebase/firestore";
+import { 
+  ref, 
+  uploadBytesResumable, 
+  getDownloadURL 
+} from "firebase/storage";
+
+// The local storage and dummy data logic is no longer needed.
+// Firestore is now the single source of truth.
 
 const generateId = (): string => {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
@@ -9,115 +25,149 @@ const generateId = (): string => {
   return result;
 };
 
-// In-memory store for issues
-let mockIssues: Issue[] = [];
-let isInitialized = false;
 
-const dummyIssuesData: Omit<Issue, 'id'>[] = [
-  {
-    title: 'Water Logging near Adajan Gam',
-    description: 'Heavy water logging after rains on the main road in Adajan. It is causing major traffic jams and is a health hazard.',
-    summary: 'Severe water logging in Adajan is causing traffic and health issues.',
-    photoUrl: 'https://placehold.co/600x400/3b82f6/ffffff?text=Water+Logging',
-    tags: ['flooding', 'drainage', 'monsoon', 'traffic'],
-    priority: Priority.HIGH,
-    location: { lat: 21.1959, lon: 72.7933 },
-    status: IssueStatus.PENDING,
-    createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-  },
-  {
-    title: 'Broken Streetlight in Piplod',
-    description: 'The streetlight on the corner near RahulRaj Mall has been broken for over a week. It is very dark and feels unsafe for pedestrians at night.',
-    summary: 'A broken streetlight near RahulRaj Mall in Piplod poses a nighttime safety risk.',
-    photoUrl: 'https://placehold.co/600x400/1f2937/ffffff?text=Broken+Light',
-    tags: ['street_light', 'safety', 'electrical'],
-    priority: Priority.MEDIUM,
-    location: { lat: 21.1554, lon: 72.7885 },
-    status: IssueStatus.IN_PROGRESS,
-    createdAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
-  },
-  {
-    title: 'Garbage Dumped near Varachha Flyover',
-    description: 'A huge pile of garbage has been illegally dumped under the Varachha flyover. It smells terrible and is attracting stray animals.',
-    summary: 'Illegal garbage dumping under Varachha flyover is creating a sanitation problem.',
-    photoUrl: 'https://placehold.co/600x400/16a34a/ffffff?text=Garbage+Dump',
-    tags: ['sanitation', 'waste', 'health_hazard'],
-    priority: Priority.HIGH,
-    location: { lat: 21.2139, lon: 72.8653 },
-    status: IssueStatus.RESOLVED,
-    createdAt: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString(),
-  },
-  {
-    title: 'Damaged bench at Gopi Talav',
-    description: 'A public bench at the Gopi Talav lakefront is broken and has sharp edges. It could injure someone.',
-    summary: 'A broken public bench with sharp edges at Gopi Talav is a safety hazard.',
-    photoUrl: 'https://placehold.co/600x400/f97316/ffffff?text=Broken+Bench',
-    tags: ['public_property', 'maintenance', 'safety'],
-    priority: Priority.LOW,
-    location: { lat: 21.1918, lon: 72.8252 },
-    status: IssueStatus.PENDING,
-    createdAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
-  },
-];
+export type NewIssueData = Omit<Issue, 'id' | 'createdAt' | 'status' | 'photoUrl' | 'actionPlan'> & { photoFile: File };
 
-const initializeMockData = () => {
-    if (!isInitialized) {
-        mockIssues = dummyIssuesData.map((issue) => ({
-            ...issue,
-            id: generateId(),
-        }));
-        isInitialized = true;
-        console.log("Mock data initialized.");
-    }
-};
+export const addIssue = (newIssueData: NewIssueData, onProgress: (progress: number) => void): Promise<Issue> => {
+  return new Promise(async (resolve, reject) => {
+    const { photoFile, ...issueData } = newIssueData;
 
-export const getIssues = async (): Promise<Issue[]> => {
-  initializeMockData();
-  // Simulate network delay
-  await new Promise(resolve => setTimeout(resolve, 500));
-  // Return a sorted copy
-  return [...mockIssues].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-};
+    // 1. Upload image to Firebase Storage with progress tracking
+    const photoId = generateId();
+    const storageRef = ref(storage, `issues/${photoId}-${photoFile.name}`);
+    const uploadTask = uploadBytesResumable(storageRef, photoFile);
 
-export type NewIssueData = Omit<Issue, 'id' | 'createdAt' | 'status' | 'photoUrl'> & { photoFile: File };
+    uploadTask.on('state_changed',
+      (snapshot) => {
+        const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+        onProgress(Math.round(progress));
+      },
+      (error) => {
+        console.error("Upload failed", error);
+        reject(error);
+      },
+      async () => {
+        try {
+          // 2. Get the public URL for the image
+          const photoUrl = await getDownloadURL(uploadTask.snapshot.ref);
 
-export const addIssue = async (newIssueData: NewIssueData): Promise<Issue> => {
-  const { photoFile, ...issueData } = newIssueData;
+          // 3. Create the new issue object to be stored in Firestore
+          const newIssueForDb = {
+            ...issueData,
+            photoUrl,
+            createdAt: new Date().toISOString(),
+            status: IssueStatus.PENDING,
+          };
 
-  // For mock data, we create a temporary URL for the uploaded photo.
-  const photoUrl = URL.createObjectURL(photoFile);
+          // 4. Add the issue document to the 'issues' collection
+          const docRef = await addDoc(collection(db, 'issues'), newIssueForDb);
 
-  const newIssue: Issue = {
-    ...issueData,
-    photoUrl,
-    id: generateId(),
-    createdAt: new Date().toISOString(),
-    status: IssueStatus.PENDING,
-  };
+          // 5. Return the full Issue object, including the new Firestore ID
+          const newIssue: Issue = {
+            ...issueData,
+            id: docRef.id,
+            photoUrl,
+            createdAt: newIssueForDb.createdAt,
+            status: newIssueForDb.status,
+          };
 
-  mockIssues.push(newIssue);
-
-  // Simulate network delay
-  await new Promise(resolve => setTimeout(resolve, 300));
-  
-  return newIssue;
+          resolve(newIssue);
+        } catch (dbError) {
+          console.error("Failed to save issue to Firestore", dbError);
+          reject(dbError);
+        }
+      }
+    );
+  });
 };
 
 export const getIssueById = async (id: string): Promise<Issue | undefined> => {
-  initializeMockData(); // Ensure data is there if this is called first
-  // Simulate network delay
-  await new Promise(resolve => setTimeout(resolve, 100));
-  return mockIssues.find(issue => issue.id === id);
-};
+  const issueDocRef = doc(db, 'issues', id);
+  const issueDoc = await getDoc(issueDocRef);
 
-export const updateIssueStatus = async (id: string, status: IssueStatus): Promise<Issue | undefined> => {
-  initializeMockData();
-  const issue = mockIssues.find(issue => issue.id === id);
-  if (issue) {
-    issue.status = status;
-    // Simulate network delay
-    await new Promise(resolve => setTimeout(resolve, 200));
-    return { ...issue }; // Return a copy
+  if (issueDoc.exists()) {
+    return { id: issueDoc.id, ...issueDoc.data() } as Issue;
   }
   return undefined;
+};
+
+export const updateIssueStatus = async (id: string, status: IssueStatus): Promise<void> => {
+  const issueDocRef = doc(db, 'issues', id);
+  await updateDoc(issueDocRef, { status });
+};
+
+export const updateIssuePriority = async (id: string, priority: Priority): Promise<void> => {
+  const issueDocRef = doc(db, 'issues', id);
+  await updateDoc(issueDocRef, { priority });
+};
+
+export const updateIssueActionPlan = async (id: string, actionPlan: ActionPlan): Promise<void> => {
+  const issueDocRef = doc(db, 'issues', id);
+  await updateDoc(issueDocRef, { actionPlan });
+};
+
+export const seedInitialIssues = async (): Promise<void> => {
+  console.log('Seeding initial issues...');
+  const issuesCollection = collection(db, 'issues');
+  
+  const dummyIssues: Omit<Issue, 'id'>[] = [
+    {
+      title: "Major Pothole on University Road",
+      description: "A very large and dangerous pothole has formed near the main gate of the university. It's causing traffic issues and could damage vehicles.",
+      summary: "A large, dangerous pothole is causing traffic problems near the university.",
+      photoUrl: "https://picsum.photos/seed/pothole/800/600",
+      tags: ["road_damage", "pothole", "traffic_hazard"],
+      priority: Priority.HIGH,
+      location: { lat: 21.1702, lon: 72.8311 }, // Surat
+      status: IssueStatus.PENDING,
+      createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(), // 2 days ago
+    },
+    {
+      title: "Streetlight Out at City Park Corner",
+      description: "The streetlight at the corner of City Park and 5th Avenue has been out for three nights. It's very dark and feels unsafe.",
+      summary: "A streetlight is out, creating a dark and potentially unsafe area at a park corner.",
+      photoUrl: "https://picsum.photos/seed/streetlight/800/600",
+      tags: ["street_light", "public_safety", "electrical"],
+      priority: Priority.MEDIUM,
+      location: { lat: 21.1959, lon: 72.8302 }, // Near Surat
+      status: IssueStatus.IN_PROGRESS,
+      createdAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(), // 5 days ago
+      actionPlan: {
+          steps: ["Inspect fixture and wiring", "Replace bulb and ballast", "Verify timer functionality"],
+          crew: "Electrical Services",
+          estimatedHours: 2
+      }
+    },
+    {
+      title: "Overflowing Public Trash Can",
+      description: "The trash can at the bus stop on Diamond Street is completely full and overflowing. Garbage is blowing into the street.",
+      summary: "A public trash can at a bus stop is overflowing, causing a sanitation issue.",
+      photoUrl: "https://picsum.photos/seed/trash/800/600",
+      tags: ["sanitation", "waste_management", "public_space"],
+      priority: Priority.LOW,
+      location: { lat: 21.2084, lon: 72.8408 }, // Another spot in Surat
+      status: IssueStatus.RESOLVED,
+      createdAt: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString(), // 10 days ago
+    },
+     {
+      title: "Broken Bench in Central Park",
+      description: "One of the wooden benches near the fountain in Central Park has a broken leg and is unusable. It could be a safety hazard for children.",
+      summary: "A park bench is broken and unusable, posing a potential safety risk.",
+      photoUrl: "https://picsum.photos/seed/bench/800/600",
+      tags: ["park_maintenance", "vandalism", "public_furniture"],
+      priority: Priority.MEDIUM,
+      location: { lat: 21.1775, lon: 72.8165 }, // Another spot
+      status: IssueStatus.PENDING,
+      createdAt: new Date().toISOString(), // Today
+    }
+  ];
+
+  try {
+    for (const issue of dummyIssues) {
+      await addDoc(issuesCollection, issue);
+    }
+    console.log('Finished seeding issues.');
+  } catch (error) {
+    console.error("Error seeding database: ", error);
+  }
 };

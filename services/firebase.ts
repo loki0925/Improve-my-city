@@ -1,12 +1,30 @@
 // This configuration is used by the Google Maps component to get an API key.
-// Firebase services like Firestore and Storage have been removed from this project
-// and replaced with a mock data service.
+// It is now also used to initialize Firebase services.
+import { initializeApp } from "firebase/app";
+import { getFirestore } from "firebase/firestore";
+import { getAuth } from "firebase/auth";
+import { getStorage } from "firebase/storage";
+
+// =================================================================================
+// IMPORTANT: CREATE YOUR OWN FIREBASE PROJECT AND PASTE YOUR CONFIGURATION HERE
+// 1. Go to console.firebase.google.com and create a new project.
+// 2. Add a new Web App to your project.
+// 3. Firebase will give you a `firebaseConfig` object. Copy it.
+// 4. Replace the entire object below with the one you copied from your project.
+// =================================================================================
 export const firebaseConfig = {
-  apiKey: "AIzaSyCi1-KHG0BQzEVEGQljRoB49iC22-SPR8k",
-  authDomain: "cityfix-91dcf.firebaseapp.com",
-  projectId: "cityfix-91dcf",
-  storageBucket: "cityfix-91dcf.firebasestorage.app",
-  messagingSenderId: "415366175928",
-  appId: "1:415366175928:web:bf2010ca21d25e8f96a84d",
-  measurementId: "G-93LG2ZK99M"
+   apiKey: "AIzaSyAtXJsbkjxxunPT0DuW51x_kHLqCV-LW1s",
+  authDomain: "cityfix-app-8d21f.firebaseapp.com",
+  projectId: "cityfix-app-8d21f",
+  storageBucket: "cityfix-app-8d21f.appspot.com",
+  messagingSenderId: "1029958752001",
+  appId: "1:1029958752001:web:700368a08e23b96b8b2d00"
 };
+
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+
+// Export the services
+export const db = getFirestore(app);
+export const auth = getAuth(app);
+export const storage = getStorage(app);

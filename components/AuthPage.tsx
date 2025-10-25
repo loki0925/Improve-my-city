@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import * as authService from '../services/authService';
+import { User } from '../types';
 
 const AuthPage: React.FC = () => {
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [role, setRole] = useState<'user' | 'admin'>('user');
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const { setCurrentUser } = useAuth();
@@ -18,18 +20,62 @@ const AuthPage: React.FC = () => {
     try {
       let user;
       if (isLogin) {
-        user = await authService.login(email, password);
-        if (!user) throw new Error("Invalid email or password.");
+        user = await authService.login(email, password, role);
+        if (!user) throw new Error("Invalid credentials or role selection.");
       } else {
-        user = await authService.signUp(email, password);
+        user = await authService.signUp(email, password, role);
       }
       setCurrentUser(user);
     } catch (err: any) {
-      setError(err.message || "An unexpected error occurred.");
+      console.error("Auth Error:", err);
+      // More specific error handling
+      if (err.code === 'permission-denied' || (err.message && err.message.toLowerCase().includes('permission'))) {
+          setError("Database permission error. Please check your Firestore security rules in the Firebase console. This is a required setup step.");
+      } else if (err.code === 'auth/configuration-not-found') {
+          setError("Firebase Authentication is not configured. Please go to your Firebase Console, navigate to Authentication -> Sign-in method, and enable the 'Email/Password' provider.");
+      } else if (err.code === 'auth/invalid-credential' || err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password') {
+          setError("Invalid email, password, or role selection. Please check your credentials and try again.");
+      } else if (err.code === 'auth/email-already-in-use') {
+          setError("An account with this email address already exists. Please try logging in or use a different email.");
+      } else {
+          setError(err.message || "An unexpected error occurred.");
+      }
     } finally {
       setIsLoading(false);
     }
   };
+
+  const RoleSelector: React.FC = () => (
+    <div>
+      <label className="block text-sm font-medium text-gray-700 mb-2">
+        {isLogin ? 'Log in as:' : 'Sign up as:'}
+      </label>
+      <div className="flex w-full rounded-md shadow-sm">
+        <button
+          type="button"
+          onClick={() => setRole('user')}
+          className={`w-1/2 rounded-l-md px-4 py-2 text-sm font-medium border ${
+            role === 'user'
+              ? 'bg-brand-blue text-white border-brand-blue z-10'
+              : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+          }`}
+        >
+          User
+        </button>
+        <button
+          type="button"
+          onClick={() => setRole('admin')}
+          className={`w-1/2 -ml-px rounded-r-md px-4 py-2 text-sm font-medium border ${
+            role === 'admin'
+              ? 'bg-brand-blue text-white border-brand-blue z-10'
+              : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+          }`}
+        >
+          Admin
+        </button>
+      </div>
+    </div>
+  );
 
   return (
     <div className="min-h-screen bg-brand-gray flex flex-col justify-center items-center p-4">
@@ -42,6 +88,7 @@ const AuthPage: React.FC = () => {
         <p className="text-center text-gray-500 mb-6">{isLogin ? 'Log in to continue' : 'Sign up to start reporting issues'}</p>
         
         <form onSubmit={handleSubmit} className="space-y-6">
+          <RoleSelector />
           <div>
             <label htmlFor="email" className="block text-sm font-medium text-gray-700">Email Address</label>
             <input
@@ -65,7 +112,7 @@ const AuthPage: React.FC = () => {
             />
           </div>
 
-          {error && <p className="text-sm text-red-600 text-center">{error}</p>}
+          {error && <p className="text-sm text-red-600 text-center p-2 bg-red-50 rounded-md border border-red-200">{error}</p>}
 
           <div>
             <button type="submit" disabled={isLoading} className="w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-base font-medium text-white bg-brand-blue hover:bg-blue-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-blue disabled:bg-gray-400">
@@ -84,7 +131,7 @@ const AuthPage: React.FC = () => {
         </p>
       </div>
       <div className="text-center mt-4 max-w-md text-xs text-gray-500">
-        <p>For testing, you can use:</p>
+        <p>These test accounts don't exist by default. You must <strong className="font-medium">Sign Up</strong> with them first.</p>
         <p><strong className="font-medium">Admin:</strong> admin@city.com / adminpassword</p>
         <p><strong className="font-medium">User:</strong> user@example.com / userpassword</p>
       </div>

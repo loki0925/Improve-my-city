@@ -1,4 +1,5 @@
 
+
 import React, { useEffect, useRef, useState } from 'react';
 import { Issue } from '../types';
 import { STATUS_MARKER_COLORS } from '../constants';
@@ -52,10 +53,10 @@ const MapDisplay: React.FC<MapDisplayProps> = ({ issues }) => {
 
   // Effect to load Google Maps script and handle errors
   useEffect(() => {
-    // This will be called by the Google Maps script if the key is invalid, preventing an app freeze.
+    // This will be called by the Google Maps script if the key is invalid or billing is not enabled.
     window.gm_authFailure = () => {
       setMapError(
-        'Google Maps failed to load. The provided API key is invalid or has not been configured correctly for the Maps JavaScript API in your Google Cloud Platform project.'
+        'Google Maps failed to load. This is often caused by an invalid API key or billing not being enabled for your project. Please check your Google Cloud Console to ensure the Maps JavaScript API is enabled and a billing account is linked.'
       );
     };
 

@@ -1,5 +1,5 @@
 import { GoogleGenAI, Type } from '@google/genai';
-import { Issue, Priority } from '../types';
+import { Issue, Priority, ActionPlan } from '../types';
 import { getIssueById } from './issueService';
 
 const API_KEY = process.env.API_KEY;
@@ -74,6 +74,60 @@ export const analyzeIssue = async (description: string, imageBase64: string, ima
     };
   }
 };
+
+export const suggestActionPlan = async (issue: Issue): Promise<ActionPlan> => {
+  try {
+    const prompt = `An administrator needs an action plan for the following civic issue. Based on the details provided, generate a concise work order.
+    
+    Issue Title: "${issue.title}"
+    Issue Summary: "${issue.summary}"
+    Description: "${issue.description}"
+    Priority: "${issue.priority}"
+    Tags: ${issue.tags.join(', ')}
+
+    Please provide the following in JSON format:
+    1. "steps": An array of 2-4 short, actionable steps to resolve the issue.
+    2. "crew": The type of municipal crew that should be assigned (e.g., "Road Maintenance Crew", "Sanitation Department", "Electrical Services", "Parks and Recreation Team").
+    3. "estimatedHours": A number representing the estimated hours to complete the work.`;
+
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash',
+      contents: { parts: [{ text: prompt }] },
+      config: {
+        responseMimeType: 'application/json',
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            steps: {
+              type: Type.ARRAY,
+              description: "An array of 2-4 actionable steps.",
+              items: {
+                type: Type.STRING
+              }
+            },
+            crew: {
+              type: Type.STRING,
+              description: "The type of crew to assign."
+            },
+            estimatedHours: {
+              type: Type.NUMBER,
+              description: "Estimated hours to complete the work."
+            }
+          }
+        }
+      }
+    });
+    
+    const jsonText = response.text.trim();
+    const result = JSON.parse(jsonText);
+    return result;
+
+  } catch (error) {
+    console.error("Error suggesting action plan from Gemini:", error);
+    throw new Error("Failed to generate an action plan. The AI service may be temporarily unavailable.");
+  }
+};
+
 
 export const getChatbotResponse = async (issueId: string): Promise<string> => {
   if (!issueId) {
