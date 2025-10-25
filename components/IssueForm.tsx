@@ -88,7 +88,11 @@ const IssueForm: React.FC<IssueFormProps> = ({ onIssueAdded }) => {
       if (err.code === 'storage/unauthorized') {
           setError("Submission failed due to a permissions error. Please update your Firebase Storage security rules to allow uploads. This is a necessary one-time setup step.");
       } else if (err.code === 'storage/bucket-not-found' || err.code === 'storage/project-not-found') {
-          setError("Submission failed because Firebase Storage is not set up correctly. Please go to your Firebase Console, navigate to the Storage section, and click 'Get Started' to enable it.");
+          setError("Submission failed: Firebase Storage has not been activated. Please go to your Firebase Console, find the Storage section, and click the 'Get Started' button to enable it. The upload will work immediately after that.");
+      } else if (err.code === 'storage/retry-limit-exceeded') {
+          setError("The upload timed out. This may be due to a slow network connection or a misconfiguration of your Firebase project's 'storageBucket' URL. Please verify your connection and config settings.");
+      } else if (err.name === 'UploadTimeout') {
+          setError("The upload took too long and timed out. This often happens if Firebase Storage is not enabled or if the `storageBucket` URL in your configuration is incorrect. Please double-check your Firebase project setup and your network connection.");
       }
       else {
           setError(`An error occurred: ${err.message || 'Please try again.'}`);

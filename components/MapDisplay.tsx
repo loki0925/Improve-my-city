@@ -1,5 +1,7 @@
 
 
+
+
 import React, { useEffect, useRef, useState } from 'react';
 import { Issue } from '../types';
 import { STATUS_MARKER_COLORS } from '../constants';
@@ -51,24 +53,32 @@ const MapDisplay: React.FC<MapDisplayProps> = ({ issues }) => {
   const [isScriptLoaded, setIsScriptLoaded] = useState(false);
   const [mapError, setMapError] = useState<string | null>(null);
 
+  const isPlaceholderKey = firebaseConfig.apiKey === "YOUR_API_KEY_HERE" || !firebaseConfig.apiKey;
+
   // Effect to load Google Maps script and handle errors
   useEffect(() => {
     // This will be called by the Google Maps script if the key is invalid or billing is not enabled.
     window.gm_authFailure = () => {
       setMapError(
-        'Google Maps failed to load. This is often caused by an invalid API key or billing not being enabled for your project. Please check your Google Cloud Console to ensure the Maps JavaScript API is enabled and a billing account is linked.'
+        'Google Maps Authentication Error. Please check the following in your Google Cloud Console for this project: 1) The "Maps JavaScript API" is enabled. 2) A billing account is linked to the project. 3) The API key has no restrictive HTTP referrers, or the current URL is allowed. For more details, open your browser\'s developer console.'
       );
     };
+
+    if (isPlaceholderKey) {
+        setMapError("The map requires a valid API key. Please open the 'services/firebase.ts' file and replace the placeholder 'YOUR_API_KEY_HERE' with the actual Web API Key from your Firebase project's settings. Note: Login may work without this, but the map will not.");
+        return;
+    }
 
     if (firebaseConfig.apiKey) {
       loadGoogleMapsScript(firebaseConfig.apiKey)
         .then(() => setIsScriptLoaded(true))
         .catch(error => {
           console.error(error);
-          setMapError(error.message);
+          setMapError(`${error.message} For more details, check your browser's developer console (F12) for specific errors from Google Maps.`);
         });
     } else {
-        const errorMsg = "Google Maps could not be loaded. The API key is missing from the Firebase configuration.";
+        // This case is covered by isPlaceholderKey, but kept for safety.
+        const errorMsg = "Google Maps could not be loaded. The API key is missing from the 'services/firebase.ts' configuration file.";
         console.error(errorMsg);
         setMapError(errorMsg);
     }
@@ -151,8 +161,11 @@ const MapDisplay: React.FC<MapDisplayProps> = ({ issues }) => {
     return (
         <div className="h-[400px] w-full bg-red-100 border border-red-300 text-red-800 rounded-lg flex items-center justify-center text-center p-4 mb-8 shadow-md">
           <div>
-            <h3 className="font-bold text-lg mb-2">Map Error</h3>
-            <p className="text-sm">{mapError}</p>
+            <h3 className="font-bold text-lg mb-2 flex items-center justify-center gap-2">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                Map Configuration Error
+            </h3>
+            <p className="text-sm text-left">{mapError}</p>
           </div>
         </div>
     );

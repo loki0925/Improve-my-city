@@ -29,7 +29,7 @@ const generateId = (): string => {
 export type NewIssueData = Omit<Issue, 'id' | 'createdAt' | 'status' | 'photoUrl' | 'actionPlan'> & { photoFile: File };
 
 export const addIssue = (newIssueData: NewIssueData, onProgress: (progress: number) => void): Promise<Issue> => {
-  return new Promise(async (resolve, reject) => {
+  const uploadPromise = new Promise<Issue>(async (resolve, reject) => {
     const { photoFile, ...issueData } = newIssueData;
 
     // 1. Upload image to Firebase Storage with progress tracking
@@ -79,6 +79,16 @@ export const addIssue = (newIssueData: NewIssueData, onProgress: (progress: numb
       }
     );
   });
+  
+  const timeoutPromise = new Promise<Issue>((_, reject) => {
+    setTimeout(() => {
+      const timeoutError = new Error("Upload timed out after 30 seconds.");
+      timeoutError.name = 'UploadTimeout';
+      reject(timeoutError);
+    }, 30000); // 30-second timeout
+  });
+
+  return Promise.race([uploadPromise, timeoutPromise]);
 };
 
 export const getIssueById = async (id: string): Promise<Issue | undefined> => {
